@@ -15,7 +15,6 @@ if not tf.test.gpu_device_name():
 else:
     print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
-
 def load_vgg(sess, vgg_path):
     """
     Load Pretrained VGG Model into TensorFlow.
@@ -41,7 +40,6 @@ def load_vgg(sess, vgg_path):
     return vgg_input, vgg_keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out
 tests.test_load_vgg(load_vgg, tf)
 
-
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
@@ -52,33 +50,41 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
- 
+    # O = ((I-K+2*P)/Stride)+1 
+    # O = Output dimesnion after convolution
+    # I = Input dimnesion
+    # K = kernel Size
+    # P = Padding
+    
+    # I = (O-1)*Stride + K 
+
     conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same', 
             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
     # 32x upsampled
-    upsample = tf.layers.conv2d_transpose(conv_1x1, num_classes, 4, 2, padding='same',
+    upsample_x32 = tf.layers.conv2d_transpose(conv_1x1, num_classes, 4, 2, padding='same',
             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     layer4_in = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, 
                                    padding= 'same', 
                                    kernel_initializer= tf.random_normal_initializer(stddev=0.01), 
                                    kernel_regularizer= tf.contrib.layers.l2_regularizer(1e-3))
-    fuse_1 = tf.add(upsample, layer4_in, name = "fuse_1")
+    fuse_1 = tf.add(upsample_x32, layer4_in, name = "fuse_1")
+
     # 16x upsampled
     layer3_in = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, 
                                     padding= 'same', 
                                     kernel_initializer= tf.random_normal_initializer(stddev=0.01), 
                                     kernel_regularizer= tf.contrib.layers.l2_regularizer(1e-3))
-    upsample2 = tf.layers.conv2d_transpose(fuse_1, num_classes, 4, 2, padding='same',
+    upsample_x16 = tf.layers.conv2d_transpose(fuse_1, num_classes, 4, 2, padding='same',
             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name = "upsample_2")
-    fuse_2 = tf.add(upsample2, layer3_in, name = "fuse_2")
-    # 8x upsampled
-    upsample3 = tf.layers.conv2d_transpose(fuse_2, num_classes, 16, strides= (8, 8), padding='same',
-            kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
-    return upsample3
-    #return upsample
-tests.test_layers(layers)
+    fuse_2 = tf.add(upsample_x16, layer3_in, name = "fuse_2")
 
+    # 8x upsampled
+    upsample_x8 = tf.layers.conv2d_transpose(fuse_2, num_classes, 16, strides= (8, 8), padding='same',
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    return upsample_x8
+
+tests.test_layers(layers)
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
@@ -98,7 +104,6 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     train_op = optimizer.minimize(cross_entropy_loss)
     return logits, train_op, cross_entropy_loss
 tests.test_optimize(optimize)
-
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate):
@@ -162,9 +167,11 @@ def run():
         
         logits, train_op, cross_entropy_loss = optimize(
                 nn_last_layer, correct_label, learning_rate, num_classes)
+
         # TODO: Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
                 correct_label, keep_prob, learning_rate)
+
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
